@@ -1,0 +1,40 @@
+# Render blueprint for sect-core.
+#
+# The free web service spins down after a stretch with no inbound traffic and takes
+# tens of seconds to wake. That is expected and designed for: the SDK's default read
+# timeout is 90s and it retries, so a disciple waking on a cron just waits a little.
+# Do not add a keep-alive pinger to work around it -- polling disciples wake it anyway,
+# and the whole point is not to pay for idle time.
+#
+# The database is Neon, not Render Postgres, so it is not declared here. Paste the Neon
+# connection string into DATABASE_URL when the blueprint prompts.
+
+services:
+  - type: web
+    name: sect-core
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+
+    envVars:
+      # Neon connection string. Use the DIRECT endpoint, not the pooled one -- a single
+      # instance with a pool of 5 has no need for PgBouncer, and transaction-mode
+      # pooling breaks asyncpg's prepared statements unless SECT_DB_PGBOUNCER is set.
+      - key: DATABASE_URL
+        sync: false
+
+      # Generate with:
+      #   python -c "import secrets; print(secrets.token_urlsafe(32))"
+      # Must be at least 32 characters; the service refuses to boot otherwise.
+      - key: SECT_MASTER_KEY
+        sync: false
+
+      # Neon's free tier has a modest connection budget and this is a single instance.
+      - key: SECT_DB_POOL_MAX
+        value: "5"
+
+      - key: LOG_LEVEL
+        value: INFO
