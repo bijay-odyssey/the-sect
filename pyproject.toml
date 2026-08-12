@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "the-sect"
+version = "0.1.0"
+description = "A small hierarchical task-orchestration framework: a shared registry and mission board for a growing collection of tiny autonomous services."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+keywords = ["task-queue", "orchestration", "postgres", "fastapi", "worker"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: System :: Distributed Computing",
+]
+
+# Base install is what a *disciple* needs: the SDK and nothing else.
+dependencies = [
+  "httpx>=0.27",
+  "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+# The Sect itself. A disciple never installs this.
+core = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "asyncpg>=0.29",
+]
+cli = [
+  "typer>=0.12",
+  "rich>=13.7",
+]
+dev = [
+  "pytest>=8.2",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+sect = "sect.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sect"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# Fixtures and tests must share one loop: the pool is created in a fixture and used
+# by the test, and asyncpg connections are bound to the loop that opened them.
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["sect"]
