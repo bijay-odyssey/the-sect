@@ -1,0 +1,46 @@
+# The reference disciple deployment: a cron job, no always-on server.
+#
+# This file lives under examples/ so it does NOT run in the-sect's own repo -- GitHub
+# only reads .github/workflows at a repository root. Copy the whole disciple-scribe
+# directory into its own repo and this becomes live.
+#
+# Two GitHub behaviours worth knowing, both already accounted for in the design:
+#   - Scheduled workflows are best-effort and can be delayed by many minutes at peak.
+#     That is why the Sect orders work by priority and recovers it with leases rather
+#     than depending on a punctual poll.
+#   - Scheduled workflows are disabled automatically after 60 days without repo
+#     activity. If a disciple goes quiet, check this before debugging the Sect.
+
+name: cultivate
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# One run at a time. A second disciple claiming a second mission is fine by the Sect,
+# but overlapping runs of the *same* worker rarely are.
+concurrency:
+  group: disciple-scribe
+  cancel-in-progress: false
+
+jobs:
+  cultivate:
+    runs-on: ubuntu-latest
+    # Comfortably longer than the mission's lease, so the runner is never killed while
+    # still holding work the Sect thinks is live.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - run: python main.py
+        env:
+          SECT_URL: ${{ vars.SECT_URL }}
+          SECT_TOKEN: ${{ secrets.SECT_TOKEN }}
