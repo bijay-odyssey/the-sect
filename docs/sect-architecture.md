@@ -1,7 +1,7 @@
 # The Sect — v0.1 Architecture
 
-*Status: approved and under implementation. §14 records how the open questions were resolved
-and where the build deviates from this plan.*
+*Status: implemented as v0.1. §14 records how the open questions were settled and where the
+build ended up differing from this plan.*
 
 A hierarchical task-orchestration framework for one person running many small services.
 Deliberately small: one HTTP service, one Postgres, two tables, and a claim protocol that
@@ -613,7 +613,7 @@ d = Disciple(
 )
 ```
 
-### 8.1 The four methods you specified
+### 8.1 The core four
 
 ```python
 d.register()                             -> DiscipleRecord   # PUT /v1/disciples/me
@@ -623,10 +623,9 @@ d.complete(mission_id, result)           -> Mission
 ```
 
 `claim()` stores the returned `claim_token` in an in-memory map keyed by mission id, so
-`complete()` and friends take the signature you asked for and the token never appears in disciple
-code.
+`complete()` and friends take a bare mission id and the token never appears in disciple code.
 
-### 8.2 Methods the accepted decisions add
+### 8.2 What leases and claim-next add
 
 ```python
 d.claim_next(art=None, lease_seconds=None)                    -> Mission | None
@@ -634,7 +633,7 @@ d.fail(mission_id, error, retryable=True, retry_after=None)   -> Mission
 d.heartbeat(mission_id, extend_seconds=None)                  -> datetime
 ```
 
-### 8.3 One convenience wrapper (cut it if you want the surface minimal)
+### 8.3 One convenience wrapper
 
 The entire body of a cron disciple, built on the primitives above — register, claim one mission,
 run it, complete with the handler's return value, or fail with the traceback:
@@ -648,8 +647,9 @@ if __name__ == "__main__":
     d.run_once(handle)  # returns the Mission, or None if the board was empty
 ```
 
-This is the only thing in the SDK beyond your stated interface. It's ~25 lines over the
-primitives and it makes the reference deployment a five-line file — but say the word and it goes.
+This is the only method in the SDK that is not a direct wrapper around an endpoint. It is ~25
+lines over the primitives and it earns them: the reference deployment becomes a five-line file,
+and the claim/complete/fail bookkeeping stops being copy-pasted into every disciple repo.
 
 ### 8.4 Master side
 
@@ -847,9 +847,9 @@ replica has to move the sweep to `POST /v1/admin/sweep` plus a cron *first*.
 
 ---
 
-## 13. Calls I made without asking
+## 13. Design calls worth knowing about
 
-Each is a one-line change if you disagree:
+None of these are load-bearing. Each is a one-line change if it turns out to be wrong:
 
 1. **Raw SQL + asyncpg, no ORM** (§9).
 2. **Numbered `.sql` migrations, no Alembic** (§9).
@@ -859,13 +859,13 @@ Each is a one-line change if you disagree:
    and cancels missions.
 6. **Sync-only SDK** — cron jobs are sync scripts.
 7. **`claim_token` never appears in a mission object** (§7.4).
-8. **`run_once(handler)`** is the only SDK method beyond your stated four plus the ones your
-   decisions implied (§8.3).
+8. **`run_once(handler)`** is the only SDK method that is not a thin wrapper over an endpoint
+   (§8.3).
 
-## 14. Resolved before implementation
+## 14. Questions left open by the plan
 
-§14 was a list of open questions in the reviewed draft. All four were resolved at build time,
-recorded here so the reasoning survives:
+Four questions were still open when this document was first written. All four were settled while
+building, and the reasoning is recorded here so it does not have to be reconstructed later:
 
 1. **Name — settled as `the-sect` (distribution) / `sect` (import).** Still confined to
    `pyproject.toml` and `src/sect/`, so a rename stays a `git mv` plus one line.
@@ -882,10 +882,10 @@ recorded here so the reasoning survives:
    cannot decide whether to claim a mission you are not allowed to read the brief of. That
    endpoint only ever exposes unclaimed work, never a `result`.
 
-### 14a. Deviations from the approved design, made during implementation
+### 14a. Where the build differs from the plan
 
-Each of these is a mechanical necessity rather than a change of direction, but they alter files
-the approved plan named:
+Each of these is a mechanical necessity rather than a change of direction, but they move or
+reshape things this document specified:
 
 - **Migrations live at `src/sect/core/migrations/`, not `/migrations`.** They are applied on boot,
   so they must ship inside the wheel and the container image. A repo-root directory would not be
@@ -903,7 +903,7 @@ the approved plan named:
 - **Python floor is 3.11**, and settings are parsed from `os.environ` by hand rather than adding
   `pydantic-settings` — one less dependency in the container and one less thing to cold-start.
 
-### 14b. Deviations from §8, made while building the SDK
+### 14b. Where the SDK differs from §8
 
 - **The timeouts in §8 were the wrong way round.** The plan set `timeout=30` with
   `connect_timeout=90`. On a free-tier host the edge accepts the TCP connection immediately and
@@ -927,11 +927,11 @@ the approved plan named:
 - **The CLI has `--json` on its read commands.** It is the only interface to the Sect until a
   dashboard exists, and a status tool you cannot pipe into `jq` is half a tool.
 
-### 14c. Not built, and not in the stage list
+### 14c. Not built yet
 
-The repo layout in §9 also names `README.md`, `docs/protocol.md` (the wire contract for
-non-Python disciples) and `docs/writing-a-disciple.md`. None of the six build stages covered
-them, so they do not exist yet.
+The repo layout in §9 also names `README.md`, `docs/protocol.md` (the wire contract, for writing
+a disciple in something other than Python) and `docs/writing-a-disciple.md`. None of them exist
+yet.
 
 ---
 
