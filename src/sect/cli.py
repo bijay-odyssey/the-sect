@@ -23,6 +23,7 @@ from rich.table import Table
 
 from sect import __version__
 from sect.client import SectMaster
+from sect.env import ensure_loaded
 from sect.errors import SectError
 from sect.models import Mission
 from sect.realms import REALMS
@@ -369,6 +370,8 @@ def sweep() -> None:
 
 
 def main() -> None:
+    # Before anything reads SECT_URL or SECT_MASTER_KEY.
+    ensure_loaded()
     app()
 
 

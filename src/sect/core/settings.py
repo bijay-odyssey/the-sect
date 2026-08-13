@@ -11,6 +11,8 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from sect.env import ensure_loaded
+
 #: A master key shorter than this is a liability on a public URL.
 MIN_MASTER_KEY_LENGTH = 32
 
@@ -62,7 +64,11 @@ class Settings:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
-        env = os.environ if env is None else env
+        if env is None:
+            # Pick up a local .env if there is one. Real environment variables win, so
+            # this is a no-op on a host that configures the process properly.
+            ensure_loaded()
+            env = os.environ
 
         database_url = env.get("DATABASE_URL", "").strip()
         if not database_url:

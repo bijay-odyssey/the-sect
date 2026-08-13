@@ -13,6 +13,7 @@ The server lives in :mod:`sect.core` and is installed separately via the ``core`
 Importing this package never pulls in FastAPI or asyncpg.
 """
 
+from sect.env import load_dotenv
 from sect.errors import (
     AuthError,
     MissionNotClaimable,
@@ -49,6 +50,7 @@ __all__ = [
     "SectStats",
     "SectUnavailable",
     "__version__",
+    "load_dotenv",
     "realm_rank",
 ]
 

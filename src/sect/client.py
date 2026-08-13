@@ -24,6 +24,7 @@ from uuid import UUID
 
 import httpx
 
+from sect.env import ensure_loaded
 from sect.errors import PermanentFailure, SectError, SectUnavailable, exception_for_code
 from sect.models import (
     ClaimResponse,
@@ -165,7 +166,12 @@ class _Client:
 
 
 def _resolve(explicit: str | None, env_var: str, what: str) -> str:
-    value = explicit or os.environ.get(env_var)
+    if explicit:
+        return explicit
+    # Loads a local .env once per process, if there is one. Real environment variables
+    # always win, so this changes nothing in CI or on a configured host.
+    ensure_loaded()
+    value = os.environ.get(env_var)
     if not value:
         raise SectError(f"No {what}: pass it explicitly or set {env_var}.")
     return value

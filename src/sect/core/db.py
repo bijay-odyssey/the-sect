@@ -15,6 +15,7 @@ from pathlib import Path
 import asyncpg
 
 from sect.core.settings import Settings
+from sect.env import ensure_loaded
 
 log = logging.getLogger("sect.core.db")
 
@@ -138,6 +139,8 @@ def _main(argv: list[str] | None = None) -> int:
     import argparse
     import asyncio
     import os
+
+    ensure_loaded()
 
     parser = argparse.ArgumentParser(
         prog="python -m sect.core.db",
