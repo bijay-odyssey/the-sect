@@ -6,6 +6,8 @@ dist/
 .venv/
 venv/
 .env
+.env.*
+!.env.example
 .pytest_cache/
 .ruff_cache/
 .coverage

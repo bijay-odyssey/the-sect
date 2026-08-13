@@ -29,6 +29,10 @@ from sect.core.app import create_app
 from sect.core.db import create_pool, run_migrations
 from sect.core.settings import Settings
 
+# A developer's .env legitimately points at a real database. The suite TRUNCATEs on
+# every test, so it must never read one. Set before anything calls ensure_loaded().
+os.environ.setdefault("SECT_SKIP_DOTENV", "1")
+
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
     "postgresql://postgres:postgres@localhost:5432/sect_test",
