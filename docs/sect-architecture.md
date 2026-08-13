@@ -927,11 +927,16 @@ reshape things this document specified:
 - **The CLI has `--json` on its read commands.** It is the only interface to the Sect until a
   dashboard exists, and a status tool you cannot pipe into `jq` is half a tool.
 
-### 14c. Not built yet
+### 14c. The rest of the documentation
 
-The repo layout in §9 also names `README.md`, `docs/protocol.md` (the wire contract, for writing
-a disciple in something other than Python) and `docs/writing-a-disciple.md`. None of them exist
-yet.
+This document is the design record and assumes the reader wants to know *why*. The other three
+answer different questions:
+
+- `README.md` — what this is, and the five-line disciple.
+- `docs/protocol.md` — the wire contract, standalone, for writing a disciple in a language other
+  than Python. It restates the parts of §14a and §14b that are visible on the wire, so an
+  implementer never has to read this file.
+- `docs/writing-a-disciple.md` — a walk through `examples/disciple-scribe/`.
 
 ---
 
