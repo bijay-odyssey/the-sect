@@ -15,7 +15,9 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
-    region: oregon
+    # Must match the Neon region. Every request makes several database round trips, so
+    # a service in Oregon against a database in Singapore pays ~180ms on each of them.
+    region: singapore
     healthCheckPath: /health
     autoDeployTrigger: commit
 
