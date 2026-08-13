@@ -8,8 +8,8 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# pyproject declares license-files = ["LICENSE"], so the build needs it present.
-COPY pyproject.toml LICENSE ./
+# pyproject declares license-files and readme, so the build needs both present.
+COPY pyproject.toml LICENSE README.md ./
 COPY src ./src
 
 # The core extra only. No CLI, no dev tooling, nothing a server does not run.

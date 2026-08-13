@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "the-sect"
 version = "0.1.0"
 description = "A small hierarchical task-orchestration framework: a shared registry and mission board for a growing collection of tiny autonomous services."
+readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
