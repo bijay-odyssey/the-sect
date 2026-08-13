@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from pathlib import Path
 
 import asyncpg
@@ -45,21 +46,42 @@ async def _init_connection(conn: asyncpg.Connection) -> None:
         )
 
 
-async def create_pool(settings: Settings) -> asyncpg.Pool:
+async def connect_pool(
+    database_url: str,
+    *,
+    min_size: int = 1,
+    max_size: int = 5,
+    pgbouncer: bool = False,
+) -> asyncpg.Pool:
+    """Open a pool from a URL alone.
+
+    Separate from :func:`create_pool` so migrations can run with nothing but
+    ``DATABASE_URL`` -- they authenticate nobody, so demanding a master key to apply
+    them would be friction for no benefit.
+    """
     kwargs: dict[str, object] = {}
-    if settings.db_pgbouncer:
+    if pgbouncer:
         # Transaction-mode pooling and prepared statements do not mix.
         kwargs["statement_cache_size"] = 0
     pool = await asyncpg.create_pool(
-        settings.database_url,
-        min_size=settings.db_pool_min,
-        max_size=settings.db_pool_max,
+        database_url,
+        min_size=min_size,
+        max_size=max_size,
         init=_init_connection,
         **kwargs,
     )
     if pool is None:  # pragma: no cover - asyncpg only returns None on misuse
         raise RuntimeError("asyncpg.create_pool returned None")
     return pool
+
+
+async def create_pool(settings: Settings) -> asyncpg.Pool:
+    return await connect_pool(
+        settings.database_url,
+        min_size=settings.db_pool_min,
+        max_size=settings.db_pool_max,
+        pgbouncer=settings.db_pgbouncer,
+    )
 
 
 def migration_files() -> list[tuple[str, str]]:
@@ -96,3 +118,67 @@ async def run_migrations(pool: asyncpg.Pool) -> list[str]:
         finally:
             await conn.execute("SELECT pg_advisory_unlock($1)", MIGRATION_LOCK_ID)
     return applied
+
+
+async def migration_status(pool: asyncpg.Pool) -> list[tuple[str, bool]]:
+    """``[(version, applied), ...]`` without changing anything."""
+    await pool.execute(CREATE_SCHEMA_MIGRATIONS)
+    done = {
+        record["version"] for record in await pool.fetch("SELECT version FROM schema_migrations")
+    }
+    return [(version, version in done) for version, _ in migration_files()]
+
+
+def _main(argv: list[str] | None = None) -> int:
+    """``python -m sect.core.db migrate|status``.
+
+    Needs only ``DATABASE_URL``. Useful for pointing at a new database and confirming
+    the schema lands before booting anything against it.
+    """
+    import argparse
+    import asyncio
+    import os
+
+    parser = argparse.ArgumentParser(
+        prog="python -m sect.core.db",
+        description="Apply or inspect the Sect's schema migrations. Reads DATABASE_URL.",
+    )
+    parser.add_argument(
+        "command",
+        choices=("migrate", "status"),
+        help="migrate: apply anything pending. status: report without changing anything.",
+    )
+    args = parser.parse_args(argv)
+
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if not database_url:
+        print("DATABASE_URL is required.", file=sys.stderr)
+        return 2
+    pgbouncer = os.environ.get("SECT_DB_PGBOUNCER", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+    async def run() -> int:
+        pool = await connect_pool(database_url, min_size=1, max_size=2, pgbouncer=pgbouncer)
+        try:
+            if args.command == "migrate":
+                applied = await run_migrations(pool)
+                for version in applied:
+                    print(f"applied  {version}")
+                if not applied:
+                    print("already up to date")
+            else:
+                for version, is_applied in await migration_status(pool):
+                    print(f"{'applied' if is_applied else 'pending':<8} {version}")
+        finally:
+            await pool.close()
+        return 0
+
+    return asyncio.run(run())
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())
