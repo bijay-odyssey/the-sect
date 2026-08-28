@@ -148,11 +148,17 @@ def create_disciple(
     repo: Annotated[str | None, typer.Option(help="Where this disciple's code lives.")] = None,
     display_name: Annotated[str | None, typer.Option(help="Human-facing name.")] = None,
     description: Annotated[str | None, typer.Option(help="What it does.")] = None,
+    peak: Annotated[str | None, typer.Option(help="Enrol in this peak, by name.")] = None,
 ) -> None:
     """Admit a disciple and print its token. The token is shown exactly once."""
     with _sect() as master:
         record, token = master.register_disciple(
-            name, art, repo_url=repo, display_name=display_name, description=description
+            name,
+            art,
+            repo_url=repo,
+            display_name=display_name,
+            description=description,
+            peak=peak,
         )
     console.print(f"[green]{record.name}[/green] admitted at realm [cyan]{record.realm}[/cyan]")
     console.print(f"\n  SECT_TOKEN={token}\n")

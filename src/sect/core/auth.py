@@ -38,6 +38,9 @@ class Principal:
     name: str
     disciple_id: UUID | None = None
     arts: tuple[str, ...] = field(default=())
+    #: The disciple's peak, if it belongs to one. Used only to sort a peak's own work
+    #: first when polling or claiming next -- never to decide what may be claimed.
+    peak_id: UUID | None = None
 
     @property
     def is_master(self) -> bool:
@@ -60,7 +63,9 @@ async def current_principal(request: Request) -> Principal:
     settings = request.app.state.settings
 
     if hmac.compare_digest(token, settings.master_key):
-        return Principal(kind="master", name="master")
+        principal = Principal(kind="master", name="master")
+        request.state.principal = principal
+        return principal
 
     row = await request.app.state.pool.fetchrow(
         sql.SELECT_DISCIPLE_BY_TOKEN_HASH, hash_token(token)
@@ -74,12 +79,15 @@ async def current_principal(request: Request) -> Principal:
             f"Disciple '{row['name']}' has been deactivated.",
             {"disciple": row["name"]},
         )
-    return Principal(
+    principal = Principal(
         kind="disciple",
         name=row["name"],
         disciple_id=row["id"],
         arts=tuple(row["arts"]),
+        peak_id=row["peak_id"],
     )
+    request.state.principal = principal
+    return principal
 
 
 async def require_master(

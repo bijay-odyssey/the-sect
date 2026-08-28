@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from sect.models import DiscipleRecord, DiscipleStats, Mission
+from sect.models import DiscipleRecord, DiscipleStats, Mission, Peak, PeakStats
 
 
 def mission_from_row(row: Mapping[str, Any]) -> Mission:
@@ -25,3 +25,12 @@ def disciple_from_row(row: Mapping[str, Any]) -> DiscipleRecord:
         failed=data.pop("stat_failed", 0) or 0,
     )
     return DiscipleRecord.model_validate(data)
+
+
+def peak_from_row(row: Mapping[str, Any]) -> Peak:
+    data = dict(row)
+    data["stats"] = PeakStats(
+        disciples=data.pop("stat_disciples", 0) or 0,
+        completed_missions=data.pop("stat_completed_missions", 0) or 0,
+    )
+    return Peak.model_validate(data)

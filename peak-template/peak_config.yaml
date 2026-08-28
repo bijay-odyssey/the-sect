@@ -1,0 +1,15 @@
+# Your peak's identity. This file is the single source of truth: main.py reads it, and
+# you register the peak from it (see the README). Keep it flat -- `key: value` lines and
+# one inline `[a, b]` list; that is all main.py's tiny parser understands.
+
+name: my-peak
+display_name: My Peak
+description: One line on what this peak is good at.
+
+# The arts this peak covers. A mission's `required_art` must be one of these for a
+# disciple of this peak to be dealt it. Keep the list tight and specific.
+arts: [example-art]
+
+# The disciple this worker registers as. Many workers can share one peak; give each a
+# distinct name, or set SECT_DISCIPLE_NAME per deployment and leave this as the default.
+disciple_name: my-peak-worker

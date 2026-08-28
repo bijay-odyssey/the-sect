@@ -1,6 +1,6 @@
 # A disciple installs the base distribution only. That is httpx + pydantic and nothing
 # else -- no FastAPI, no asyncpg, no database driver. A worker never talks to Postgres.
-the-sect @ git+https://github.com/YOUR-USERNAME/the-sect@main
+the-sect @ git+https://github.com/bijay-odyssey/the-sect@main
 
 # Working inside this repo instead of a real disciple repo? Use the local checkout:
 #   pip install -e ../..

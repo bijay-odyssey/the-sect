@@ -22,7 +22,8 @@ from sect.realms import Realm
 # --------------------------------------------------------------------------- #
 
 #: A disciple's public identifier. Lowercase slug, 1-64 chars. Matches the CHECK
-#: constraint on ``disciples.name`` -- keep the two in step.
+#: constraint on ``disciples.name`` -- keep the two in step. ``peaks.name`` uses the
+#: same shape.
 DiscipleName = Annotated[str, StringConstraints(pattern=r"^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$")]
 
 #: A skill tag. Same shape as a name, but dots and underscores are allowed so tags can
@@ -76,6 +77,9 @@ class Mission(BaseModel):
 
     idempotency_key: str | None = None
     posted_by: str = "master"
+    #: Optional routing hint, by peak name. Never gates a claim (a peak is not a wall) --
+    #: it only sorts a peak's own work first for that peak's disciples.
+    peak: str | None = None
     created_at: datetime
     updated_at: datetime
     finished_at: datetime | None = None
@@ -112,6 +116,8 @@ class MissionCreate(BaseModel):
     max_attempts: int | None = Field(default=None, ge=1, le=100)
     not_before: datetime | None = None
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
+    #: Optional peak name. A routing hint only -- it never restricts who may claim.
+    peak: str | None = None
 
 
 class ClaimRequest(BaseModel):
@@ -169,8 +175,10 @@ class FailRequest(BaseModel):
 class DiscipleStats(BaseModel):
     """Mission counts attributed to a disciple.
 
-    ``failed`` counts terminal failures only. A retryable failure clears the holder
-    columns and returns the mission to the board, so it is attributed to nobody.
+    ``claimed`` is a live count of what the disciple holds right now. ``completed`` and
+    ``failed`` mirror the disciple's stored contribution ledger; ``failed`` counts
+    terminal failures only -- a retryable failure clears the holder columns and returns
+    the mission to the board, so it is attributed to nobody.
     """
 
     claimed: int = 0
@@ -185,6 +193,9 @@ class DiscipleRecord(BaseModel):
     display_name: str | None = None
     arts: list[str]
     realm: Realm
+    #: The peak this disciple belongs to, by name, or ``None`` for a wandering
+    #: cultivator. Affiliation is a preference, not a gate.
+    peak: str | None = None
     repo_url: str | None = None
     description: str | None = None
     agent_version: str | None = None
@@ -192,6 +203,14 @@ class DiscipleRecord(BaseModel):
     last_seen_at: datetime | None = None
     created_at: datetime
     stats: DiscipleStats = Field(default_factory=DiscipleStats)
+
+    #: The contribution ledger. Earned from completed missions; it follows the disciple
+    #: across peaks. ``reputation`` is ``floor(contribution_points * success_rate)``.
+    contribution_points: int = 0
+    completed_missions: int = 0
+    failed_missions: int = 0
+    success_rate: float = 0.0
+    reputation: int = 0
 
 
 class DiscipleCreate(BaseModel):
@@ -205,6 +224,8 @@ class DiscipleCreate(BaseModel):
     name: DiscipleName
     display_name: str | None = None
     arts: list[Art] = Field(min_length=1)
+    #: Optional peak to enrol the disciple in, by name. Omit for a wandering cultivator.
+    peak: str | None = None
     repo_url: str | None = None
     description: str | None = None
 
@@ -227,6 +248,9 @@ class DiscipleSelfUpdate(BaseModel):
 
     display_name: str | None = None
     arts: list[Art] | None = Field(default=None, min_length=1)
+    #: A disciple may join or leave a peak on its own -- affiliation is a choice, not a
+    #: privilege. Send ``null`` to become a wandering cultivator again.
+    peak: str | None = None
     repo_url: str | None = None
     description: str | None = None
     agent_version: str | None = Field(default=None, max_length=200)
@@ -244,10 +268,77 @@ class DisciplePatch(BaseModel):
 
     display_name: str | None = None
     arts: list[Art] | None = Field(default=None, min_length=1)
+    #: Reassign the disciple to a peak, by name, or ``null`` to unaffiliate.
+    peak: str | None = None
     repo_url: str | None = None
     description: str | None = None
     realm: Realm | None = None
     active: bool | None = None
+
+
+# --------------------------------------------------------------------------- #
+# Peaks
+# --------------------------------------------------------------------------- #
+
+PeakStatus = Literal["active", "inactive", "suspended"]
+
+
+class PeakStats(BaseModel):
+    """Display roll-up for a peak.
+
+    Contribution points are per-disciple and follow a disciple across peaks, so these
+    are read-only aggregates for a roster view -- not a score the peak owns.
+    """
+
+    disciples: int = 0
+    completed_missions: int = 0
+
+
+class Peak(BaseModel):
+    """A peak as it appears on the wire."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+    display_name: str
+    description: str = ""
+    arts: list[str] = Field(default_factory=list)
+    status: PeakStatus = "active"
+    last_seen_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+    stats: PeakStats = Field(default_factory=PeakStats)
+
+
+class PeakCreate(BaseModel):
+    """Body of ``POST /v1/peaks``. Master key only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: DiscipleName
+    display_name: str = Field(min_length=1, max_length=200)
+    description: str = ""
+    arts: list[Art] = Field(default_factory=list)
+
+
+class PeakPatch(BaseModel):
+    """Body of ``PATCH /v1/peaks/{name}``. Master key only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+    arts: list[Art] | None = None
+    status: PeakStatus | None = None
+
+
+class PeakList(BaseModel):
+    peaks: list[Peak]
+    count: int
+
+
+class PeakHeartbeatResponse(BaseModel):
+    last_seen_at: datetime
 
 
 # --------------------------------------------------------------------------- #

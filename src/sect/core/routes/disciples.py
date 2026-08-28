@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
+import asyncpg
 from fastapi import APIRouter, Query
 
 from sect.core import sql
@@ -14,7 +15,7 @@ from sect.core.auth import (
     hash_token,
     mint_token,
 )
-from sect.core.deps import PoolDep
+from sect.core.deps import PoolDep, resolve_peak_id
 from sect.core.exceptions import SectHTTPError
 from sect.core.rows import disciple_from_row
 from sect.models import (
@@ -30,6 +31,16 @@ from sect.realms import Realm
 router = APIRouter(prefix="/disciples", tags=["disciples"])
 
 
+async def _resolve_peak_field(fields: dict, pool: asyncpg.Pool) -> None:
+    """Translate an explicit ``peak`` name in an update dict into a ``peak_id`` column.
+
+    Keeps the unset/null distinction: ``peak`` absent means "leave the affiliation
+    alone", ``peak: null`` means "become a wandering cultivator".
+    """
+    if "peak" in fields:
+        fields["peak_id"] = await resolve_peak_id(pool, fields.pop("peak"))
+
+
 @router.post("", response_model=DiscipleCreated, status_code=201)
 async def register_disciple(
     body: DiscipleCreate,
@@ -42,6 +53,7 @@ async def register_disciple(
     way to recover it later -- rotate instead.
     """
     token = mint_token()
+    peak_id = await resolve_peak_id(pool, body.peak)
     created = await pool.fetchrow(
         sql.INSERT_DISCIPLE,
         body.name,
@@ -50,6 +62,7 @@ async def register_disciple(
         body.repo_url,
         body.description,
         hash_token(token),
+        peak_id,
     )
     if created is None:
         raise SectHTTPError(
@@ -95,8 +108,11 @@ async def update_self(
             "via PATCH /v1/disciples/{name} with the master key.",
         )
     fields.pop("realm", None)
+    await _resolve_peak_field(fields, pool)
 
-    statement, args = sql.build_disciple_update(fields, sql.SELF_UPDATABLE, touch_last_seen=True)
+    statement, args = sql.build_update(
+        "disciples", fields, sql.SELF_UPDATABLE, touch_last_seen=True
+    )
     args[-1] = principal.disciple_id
     await pool.execute(statement, *args)
 
@@ -125,7 +141,10 @@ async def patch_disciple(
         raise SectHTTPError(404, "disciple_not_found", f"No disciple named '{name}'.")
 
     fields = body.model_dump(exclude_unset=True)
-    statement, args = sql.build_disciple_update(fields, sql.MASTER_UPDATABLE, touch_last_seen=False)
+    await _resolve_peak_field(fields, pool)
+    statement, args = sql.build_update(
+        "disciples", fields, sql.MASTER_UPDATABLE, touch_last_seen=False
+    )
     if statement:
         args[-1] = existing["id"]
         await pool.execute(statement, *args)

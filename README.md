@@ -20,6 +20,7 @@ fun than `worker` and `job`:
 | **Art** | a skill tag. Disciples declare them; missions require one |
 | **Mission Hall** | the task board |
 | **Cultivation realm** | a maturity tier per disciple, granted rather than claimed |
+| **Peak** | a specialty a disciple can join (`v0.2`). A routing hint, never a wall |
 
 ---
 
@@ -98,19 +99,41 @@ one winner. Swapping in the naive read-then-write version hands the same mission
 
 ---
 
+---
+
+## Peaks (v0.2)
+
+A **peak** is a specialty a growing collection of disciples can organise around — `scraping-peak`,
+`llm-peak`, `backup-peak`. Register one, point disciples at it, and those disciples are offered
+their peak's work first. That is the *only* effect: a mission tagged with a peak is still
+claimable by any disciple whose arts match. Specialization is for excellence, not exclusion.
+
+```console
+$ curl -X POST $SECT_URL/v1/peaks -H "Authorization: Bearer $SECT_MASTER_KEY" \
+    -d '{"name":"scraping-peak","display_name":"Web Scraping Peak","arts":["web_scraping"]}'
+$ sect disciple create scraper --art web_scraping --peak scraping-peak
+```
+
+Completed missions earn a disciple **contribution points**; `reputation` is
+`points × success_rate`. Both follow the disciple, not the peak. `examples/../peak-template/` is a
+fork-and-fill-in starting point for a new peak.
+
+---
+
 ## Docs
 
-- [docs/sect-architecture.md](docs/sect-architecture.md) — the full v0.1 design: schema, every
-  endpoint, the SDK, and why the claim is correct.
+- [docs/sect-architecture.md](docs/sect-architecture.md) — the full design: schema, every
+  endpoint, the SDK, and why the claim is correct. §16 is the v0.2 Peak System addendum.
 - [docs/protocol.md](docs/protocol.md) — the wire contract, for writing a disciple in something
   other than Python.
 - [docs/writing-a-disciple.md](docs/writing-a-disciple.md) — a walk through the worked example in
   `examples/disciple-scribe/`.
+- [peak-template/](peak-template/) — copy this to start a new peak.
 
 ## Status
 
-v0.1, and honestly scoped: no dashboard, no queue transport, and no Halls or Elders layer for
-grouping disciples yet. The architecture doc records what was deliberately left out and where the
-seams for it are.
+v0.2: peaks, a per-disciple contribution ledger, structured JSON logs. Still honestly scoped —
+no dashboard and no queue transport yet. The architecture doc records what was deliberately left
+out and where the seams for it are.
 
 Requires Python 3.11+ and PostgreSQL 13+. Apache-2.0.

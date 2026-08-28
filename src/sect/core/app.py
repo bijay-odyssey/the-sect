@@ -21,7 +21,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from sect import __version__
 from sect.core.db import create_pool, run_migrations
 from sect.core.exceptions import SectHTTPError
-from sect.core.routes import disciples, meta, missions
+from sect.core.logs import access_log_middleware, configure
+from sect.core.routes import disciples, meta, missions, peaks
 from sect.core.settings import Settings
 
 log = logging.getLogger("sect.core")
@@ -56,7 +57,7 @@ def create_app(
     lifespan's ownership of it.
     """
     settings = settings or Settings.from_env()
-    logging.basicConfig(level=settings.log_level)
+    configure(settings.log_level, json_lines=settings.log_json)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -81,6 +82,7 @@ def create_app(
     )
     app.state.settings = settings
     app.state.pool = pool
+    app.middleware("http")(access_log_middleware)
 
     # --- one error envelope, everywhere ------------------------------------ #
 
@@ -118,6 +120,7 @@ def create_app(
     v1 = APIRouter(prefix="/v1")
     v1.include_router(disciples.router)
     v1.include_router(missions.router)
+    v1.include_router(peaks.router)
     v1.include_router(meta.router)
 
     app.include_router(v1)

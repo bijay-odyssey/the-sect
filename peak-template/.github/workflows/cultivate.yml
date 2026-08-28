@@ -1,0 +1,43 @@
+# A peak worker: a cron job, no always-on server.
+#
+# This lives under the-sect's own repo as a TEMPLATE and does not run here. Copy the
+# whole peak-template/ directory into its own repository and this becomes live.
+#
+# Two GitHub behaviours to expect rather than debug, both accounted for by the Sect's
+# priority + lease design:
+#   - Scheduled workflows are best-effort and can be delayed by many minutes at peak.
+#   - Scheduled workflows are disabled after 60 days without repo activity.
+
+name: cultivate
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# One run at a time. A second worker claiming a second mission is fine by the Sect;
+# overlapping runs of the *same* worker rarely are.
+concurrency:
+  group: ${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  cultivate:
+    runs-on: ubuntu-latest
+    # Comfortably longer than the mission lease, so the runner is not killed while it
+    # still holds work the Sect believes is live.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - run: python main.py
+        env:
+          SECT_URL: ${{ vars.SECT_URL }}
+          SECT_TOKEN: ${{ secrets.SECT_TOKEN }}

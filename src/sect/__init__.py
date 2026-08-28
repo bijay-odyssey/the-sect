@@ -32,7 +32,7 @@ from sect.models import (
 )
 from sect.realms import REALMS, Realm, realm_rank
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "REALMS",
