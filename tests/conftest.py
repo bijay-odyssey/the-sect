@@ -52,6 +52,8 @@ def settings() -> Settings:
         # be the thing that serializes them, or they would prove nothing.
         db_pool_max=25,
         auto_migrate=False,
+        # Plain-text logs keep pytest -q output readable.
+        log_json=False,
     )
 
 
@@ -73,7 +75,7 @@ def _migrated(settings: Settings) -> None:
 async def pool(settings: Settings) -> AsyncIterator[asyncpg.Pool]:
     pool = await create_pool(settings)
     try:
-        await pool.execute("TRUNCATE missions, disciples RESTART IDENTITY CASCADE")
+        await pool.execute("TRUNCATE missions, disciples, peaks RESTART IDENTITY CASCADE")
         yield pool
     finally:
         await pool.close()
@@ -99,15 +101,35 @@ class Sect:
     def headers(token: str) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"}
 
-    async def create_disciple(self, name: str, arts: Iterable[str] = ("test",)) -> str:
+    async def create_disciple(
+        self, name: str, arts: Iterable[str] = ("test",), *, peak: str | None = None
+    ) -> str:
         """Register a disciple and return its token."""
-        response = await self.client.post(
-            "/v1/disciples",
-            json={"name": name, "arts": list(arts)},
-            headers=self.master_headers,
-        )
+        body: dict[str, Any] = {"name": name, "arts": list(arts)}
+        if peak is not None:
+            body["peak"] = peak
+        response = await self.client.post("/v1/disciples", json=body, headers=self.master_headers)
         assert response.status_code == 201, response.text
         return response.json()["token"]
+
+    async def create_peak(
+        self, name: str, arts: Iterable[str] = ("test",), **overrides: Any
+    ) -> dict[str, Any]:
+        """Register a peak and return it."""
+        body: dict[str, Any] = {
+            "name": name,
+            "display_name": overrides.pop("display_name", name.replace("-", " ").title()),
+            "arts": list(arts),
+            **overrides,
+        }
+        response = await self.client.post("/v1/peaks", json=body, headers=self.master_headers)
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    async def disciple(self, name: str) -> dict[str, Any]:
+        response = await self.client.get(f"/v1/disciples/{name}", headers=self.master_headers)
+        assert response.status_code == 200, response.text
+        return response.json()
 
     async def disciple_id(self, name: str) -> Any:
         return await self.pool.fetchval("SELECT id FROM disciples WHERE name = $1", name)
@@ -192,7 +214,7 @@ def db(settings: Settings) -> Db:
 
 @pytest.fixture
 def clean_db(db: Db) -> None:
-    db.execute("TRUNCATE missions, disciples RESTART IDENTITY CASCADE")
+    db.execute("TRUNCATE missions, disciples, peaks RESTART IDENTITY CASCADE")
 
 
 @pytest.fixture(scope="session")

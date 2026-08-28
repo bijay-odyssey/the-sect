@@ -1,7 +1,7 @@
 # The Sect — v0.1 Architecture
 
 *Status: implemented as v0.1. §14 records how the open questions were settled and where the
-build ended up differing from this plan.*
+build ended up differing from this plan. **§16 is the v0.2.0 addendum: the Peak System.***
 
 A hierarchical task-orchestration framework for one person running many small services.
 Deliberately small: one HTTP service, one Postgres, two tables, and a claim protocol that
@@ -832,7 +832,7 @@ a predictable poll cadence.
 
 | Deferred | The seam it attaches to |
 |---|---|
-| **Halls & Elders** | Add a `halls` table + `disciples.hall_id`; missions gain an optional hall filter. Nothing in v0.1 blocks it |
+| ~~**Halls & Elders**~~ → **Peaks** | **Landed in v0.2.0 (§16).** A `peaks` table + `disciples.peak_id` + an optional `missions.peak_id` routing *hint*. Advisory only: it reorders the open board and `claim-next`, never the claimable predicate |
 | **`mission_events`** append-only audit log | One insert per transition. First thing to add when debugging gets annoying |
 | **Dashboard UI** | `GET /v1/stats` and the list endpoints are already its data source |
 | **Queue transport** (Upstash/ARQ) | Would replace polling, not the schema — the claim contract is transport-agnostic |
@@ -959,3 +959,122 @@ in CI — free on GitHub Actions).
 - **`test_complete_replay`** — completing twice with the same token returns `200` both times.
 - **`test_auth_matrix`** — master-only endpoints reject disciple tokens; identity-bearing
   endpoints reject the master key; an inactive disciple's token is rejected everywhere.
+  *(Landed in v0.2.0 as `tests/test_auth.py`, alongside `tests/test_realms_match_database.py` —
+  the realm-Literal-vs-DB-CHECK drift guard `sect/realms.py` always promised.)*
+
+---
+
+## 16. Peak System — v0.2.0 addendum
+
+> This section is additive. Every v0.1 endpoint, SQL statement, and guarantee above still
+> holds unchanged. A Sect with no peaks behaves exactly as it did in v0.1.
+
+### 16.1 What a peak is
+
+A **peak** is a named specialty group: a slug, a `display_name`, a set of `arts`, and a status.
+Disciples may belong to one (`disciples.peak_id`) or wander unaffiliated (`peak_id IS NULL`).
+A mission may carry a `peak_id` as a **routing hint**.
+
+A peak is deliberately *not* a service. It has no token, no inbound port, no uptime. It is an
+identity that a set of disciples share — each disciple is still just a process with a token and
+outbound HTTPS, exactly as in §1.4. Push dispatch (the core POSTing a mission to a peak endpoint)
+is a v0.3+ idea; the columns for it land in the migration that wires it up, not before.
+
+### 16.2 The rule that matters: a peak is not a wall
+
+`missions.peak_id` **never** gates a claim. It appears in exactly two places, both `ORDER BY`
+terms:
+
+```sql
+-- CLAIM_NEXT subquery, and LIST_OPEN_MISSIONS
+ORDER BY COALESCE($peak::uuid IS NOT NULL AND m.peak_id = $peak::uuid, false) DESC,
+         m.priority DESC, m.created_at ASC
+```
+
+So a disciple is offered its own peak's matching work **first**, but any disciple whose `arts`
+match can still be dealt any mission. `CLAIM_MISSION` (claim a *specific* mission by id) is
+byte-for-byte unchanged — peak has no role there. The claimable predicate (`_CLAIMABLE`) is
+untouched, so §6's atomicity argument carries over verbatim.
+
+*(The `COALESCE(..., false)` is load-bearing: `bool AND NULL` is `NULL`, and Postgres sorts
+`NULL` first under `DESC`, which would push un-hinted missions ahead of the peak's own.)*
+
+### 16.3 Contribution ledger
+
+Five columns on `disciples`, moved in the **same statement** as the mission outcome:
+
+| Column | On `complete` | On terminal `fail` | On retryable `fail` |
+|---|---|---|---|
+| `completed_missions` | `+1` | — | — |
+| `failed_missions` | — | `+1` | — (attributed to nobody) |
+| `contribution_points` | `+1` | `- SECT_FAILURE_POINT_PENALTY` (default 0, floored at 0) | — |
+| `success_rate` | `completed / (completed + failed)` | recomputed | — |
+| `reputation` | `floor(contribution_points * success_rate)` | recomputed | — |
+
+`COMPLETE_MISSION` and `FAIL_MISSION` each grew one data-modifying CTE (`credit` / `debit`).
+PostgreSQL runs a data-modifying `WITH` **exactly once and to completion** regardless of whether
+the primary query reads its output, so the ledger and the mission status commit together in one
+implicit transaction. The CTE keys off the outcome CTE's `RETURNING`, so it fires only when the
+guarded `UPDATE` actually matched — a replayed `complete()` never double-counts.
+
+Points and reputation are **per disciple**, not per peak: a disciple's standing follows it if it
+transfers. `0002_peaks.sql` backfills the columns from existing mission history so they are the
+single source of truth from the first boot; `SELECT_DISCIPLE` now reads the columns instead of a
+live `COUNT(*)`. Only `stats.claimed` (how many missions a disciple holds *right now*) is still
+counted live.
+
+### 16.4 Schema (`0002_peaks.sql`)
+
+```sql
+CREATE TABLE peaks (
+    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name         text NOT NULL UNIQUE CHECK (name ~ '^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$'),
+    display_name text NOT NULL,
+    description  text NOT NULL DEFAULT '',
+    arts         text[] NOT NULL DEFAULT '{}',          -- may be empty
+    status       text NOT NULL DEFAULT 'active'
+                   CHECK (status IN ('active','inactive','suspended')),
+    last_seen_at timestamptz,
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    updated_at   timestamptz NOT NULL DEFAULT now()      -- trigger-maintained
+);
+CREATE INDEX peaks_arts_gin   ON peaks USING gin (arts);
+CREATE INDEX peaks_active_idx ON peaks (name) WHERE status = 'active';
+
+ALTER TABLE disciples ADD COLUMN peak_id uuid REFERENCES peaks(id) ON DELETE SET NULL;
+ALTER TABLE missions  ADD COLUMN peak_id uuid REFERENCES peaks(id) ON DELETE SET NULL;
+ALTER TABLE disciples
+  ADD COLUMN contribution_points integer NOT NULL DEFAULT 0,
+  ADD COLUMN completed_missions  integer NOT NULL DEFAULT 0 CHECK (completed_missions >= 0),
+  ADD COLUMN failed_missions     integer NOT NULL DEFAULT 0 CHECK (failed_missions >= 0),
+  ADD COLUMN success_rate        double precision NOT NULL DEFAULT 0.0,
+  ADD COLUMN reputation          integer NOT NULL DEFAULT 0;
+```
+
+### 16.5 Endpoints (all additive; master-only for writes)
+
+| Method | Path | Principal | Purpose |
+|---|---|---|---|
+| POST | `/v1/peaks` | master | Register a peak. `409 peak_exists` on a duplicate name |
+| GET | `/v1/peaks` | any | List peaks. `?art=` filter; `?status=` (default `active`) |
+| GET | `/v1/peaks/{name}` | any | One peak + roll-up stats. `404 peak_not_found` |
+| PATCH | `/v1/peaks/{name}` | master | Edit metadata, arts, status |
+| DELETE | `/v1/peaks/{name}` | master | Soft delete → `status = 'inactive'` |
+| POST | `/v1/peaks/{name}/heartbeat` | master | Set `last_seen_at` (operator visibility only) |
+
+`peak` is now an optional field on `POST /v1/missions` (a name; `404` if unknown), on
+`POST /v1/disciples` and `PATCH /v1/disciples/{name}` (master), and on `PUT /v1/disciples/me` —
+a disciple **may** join or leave a peak itself; affiliation is a choice, not a privilege like
+`realm`. Peaks and disciples are addressed by **name** on the wire; their UUIDs stay server-side.
+
+**Peak auth, and why master-only.** A peak has no token in v0.2.0. The `peak_admin` / `peak_token`
+principals sketched during design were dropped: they need a whole new auth path for a thing that
+is "not a service", which cuts against keeping the core tiny. If push dispatch ever lands, that
+is when a peak grows a credential.
+
+### 16.6 What did not change
+
+No queue, no broker, no always-on peak. The claim is still one guarded `UPDATE`. `missions/open`
+still performs the zombie sweep on read, so the §12 read-replica caveat still stands. Realms are
+untouched and orthogonal — a realm is trust the Sect grants; a peak is a specialty a disciple
+picks.

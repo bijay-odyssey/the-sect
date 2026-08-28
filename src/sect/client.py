@@ -196,6 +196,7 @@ class Disciple:
         base_url: str | None = None,
         token: str | None = None,
         display_name: str | None = None,
+        peak: str | None = None,
         repo_url: str | None = None,
         description: str | None = None,
         agent_version: str | None = None,
@@ -209,6 +210,9 @@ class Disciple:
         self.name = name
         self.arts = list(arts)
         self.display_name = display_name
+        #: The peak this worker belongs to. Re-asserted on every ``register()``, like
+        #: ``arts``. The peak must already exist, or ``register()`` gets a 404.
+        self.peak = peak
         self.repo_url = repo_url
         self.description = description
         self.agent_version = agent_version
@@ -238,6 +242,7 @@ class Disciple:
         body: dict[str, Any] = {"arts": self.arts}
         for field, value in (
             ("display_name", self.display_name),
+            ("peak", self.peak),
             ("repo_url", self.repo_url),
             ("description", self.description),
             ("agent_version", self.agent_version),
@@ -429,10 +434,15 @@ class SectMaster:
         arts: Sequence[str],
         *,
         display_name: str | None = None,
+        peak: str | None = None,
         repo_url: str | None = None,
         description: str | None = None,
     ) -> tuple[DiscipleRecord, str]:
-        """Admit a disciple. Returns the record and its token -- shown only this once."""
+        """Admit a disciple. Returns the record and its token -- shown only this once.
+
+        ``peak`` enrols the disciple in an existing peak by name; omit it for a
+        wandering cultivator.
+        """
         response = self._client.request(
             "POST",
             "/v1/disciples",
@@ -440,6 +450,7 @@ class SectMaster:
                 "name": name,
                 "arts": list(arts),
                 "display_name": display_name,
+                "peak": peak,
                 "repo_url": repo_url,
                 "description": description,
             },

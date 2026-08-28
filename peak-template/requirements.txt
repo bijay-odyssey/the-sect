@@ -1,0 +1,8 @@
+# A peak worker installs the base distribution only: httpx + pydantic, nothing else.
+# No FastAPI, no asyncpg -- a worker never talks to Postgres.
+#
+# Pin to the tag your Sect runs. Bump both together.
+the-sect @ git+https://github.com/bijay-odyssey/the-sect@v0.2.0
+
+# Developing inside the-sect repo itself? Use the local checkout instead:
+#   pip install -e ..

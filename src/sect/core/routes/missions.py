@@ -19,7 +19,7 @@ from fastapi import APIRouter, Query, Response
 
 from sect.core import sql
 from sect.core.auth import AnyPrincipal, DisciplePrincipal, MasterPrincipal, Principal
-from sect.core.deps import PoolDep, SettingsDep
+from sect.core.deps import PoolDep, SettingsDep, resolve_peak_id
 from sect.core.exceptions import SectHTTPError
 from sect.core.rows import mission_from_row
 from sect.core.settings import Settings
@@ -186,6 +186,7 @@ async def post_mission(
     lease = body.lease_seconds or settings.default_lease_seconds
     _resolve_lease(lease, settings)
     max_attempts = body.max_attempts or settings.default_max_attempts
+    peak_id = await resolve_peak_id(pool, body.peak)
 
     row = await pool.fetchrow(
         sql.INSERT_MISSION,
@@ -199,6 +200,7 @@ async def post_mission(
         body.not_before,
         body.idempotency_key,
         principal.name,
+        peak_id,
     )
 
     if row is None:
@@ -228,7 +230,12 @@ async def list_open_missions(
     """
     await pool.execute(sql.SWEEP_EXHAUSTED)
     arts = _authorized_arts(principal, art)
-    rows = await pool.fetch(sql.LIST_OPEN_MISSIONS, arts, min(limit, settings.max_poll_limit))
+    rows = await pool.fetch(
+        sql.LIST_OPEN_MISSIONS,
+        arts,
+        min(limit, settings.max_poll_limit),
+        None if principal.is_master else principal.peak_id,
+    )
     missions = [mission_from_row(row) for row in rows]
     return OpenMissionList(missions=missions, count=len(missions))
 
@@ -302,7 +309,7 @@ async def claim_next_mission(
     arts = _authorized_arts(principal, body.arts)
     lease = _resolve_lease(body.lease_seconds, settings)
 
-    row = await pool.fetchrow(sql.CLAIM_NEXT, principal.disciple_id, arts, lease)
+    row = await pool.fetchrow(sql.CLAIM_NEXT, principal.disciple_id, arts, lease, principal.peak_id)
     if row is None:
         return Response(status_code=204)
     return ClaimResponse(mission=mission_from_row(row), claim_token=row["claim_token"])
@@ -392,8 +399,13 @@ async def fail_mission(
     body: FailRequest,
     principal: DisciplePrincipal,
     pool: PoolDep,
+    settings: SettingsDep,
 ) -> Mission:
-    """Report failure. Retryable failures go back on the board after a backoff."""
+    """Report failure. Retryable failures go back on the board after a backoff.
+
+    A terminal failure moves the holder's ledger: ``failed_missions`` goes up and, if
+    ``SECT_FAILURE_POINT_PENALTY`` is set, that many contribution points come off.
+    """
     row = await pool.fetchrow(
         sql.FAIL_MISSION,
         mission_id,
@@ -402,6 +414,7 @@ async def fail_mission(
         body.claim_token,
         body.retryable,
         body.retry_after_seconds,
+        settings.failure_point_penalty,
     )
     if row is None:
         raise _holder_conflict(await _load_holder_state(pool, mission_id, body.claim_token))

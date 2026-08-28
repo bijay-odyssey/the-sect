@@ -89,7 +89,7 @@ with Disciple(
     arts=[ART],
     display_name="The Scribe",
     description="Turns long documents into short ones.",
-    repo_url="https://github.com/YOUR-USERNAME/disciple-scribe",
+    repo_url="https://github.com/bijay-odyssey/disciple-scribe",
     agent_version=os.environ.get("GITHUB_SHA", "local")[:12],
 ) as disciple:
     mission = disciple.run_once(handle)

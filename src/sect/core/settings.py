@@ -52,6 +52,9 @@ class Settings:
     max_lease_seconds: int = 86_400
     default_max_attempts: int = 3
     max_poll_limit: int = 100
+    #: Contribution points removed from a disciple on a *terminal* mission failure.
+    #: 0 keeps failure blameless-but-recorded (failed_missions still rises).
+    failure_point_penalty: int = 0
 
     db_pool_min: int = 1
     db_pool_max: int = 5
@@ -61,6 +64,8 @@ class Settings:
 
     auto_migrate: bool = True
     log_level: str = "INFO"
+    #: One JSON object per log line. Off falls back to plain text.
+    log_json: bool = True
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -90,11 +95,13 @@ class Settings:
             max_lease_seconds=_env_int(env, "SECT_MAX_LEASE_SECONDS", 86_400),
             default_max_attempts=_env_int(env, "SECT_DEFAULT_MAX_ATTEMPTS", 3),
             max_poll_limit=_env_int(env, "SECT_MAX_POLL_LIMIT", 100),
+            failure_point_penalty=_env_int(env, "SECT_FAILURE_POINT_PENALTY", 0),
             db_pool_min=_env_int(env, "SECT_DB_POOL_MIN", 1),
             db_pool_max=_env_int(env, "SECT_DB_POOL_MAX", 5),
             db_pgbouncer=_env_bool(env, "SECT_DB_PGBOUNCER", False),
             auto_migrate=_env_bool(env, "SECT_AUTO_MIGRATE", True),
             log_level=env.get("LOG_LEVEL", "INFO").upper(),
+            log_json=_env_bool(env, "SECT_LOG_JSON", True),
         )
 
         if settings.default_lease_seconds > settings.max_lease_seconds:
