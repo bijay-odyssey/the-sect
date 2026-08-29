@@ -19,6 +19,11 @@ classifiers = [
   "Topic :: System :: Distributed Computing",
 ]
 
+[project.urls]
+Repository = "https://github.com/bijay-odyssey/the-sect"
+Issues = "https://github.com/bijay-odyssey/the-sect/issues"
+Changelog = "https://github.com/bijay-odyssey/the-sect/blob/main/CHANGELOG.md"
+
 # Base install is what a *disciple* needs: the SDK and nothing else.
 dependencies = [
   "httpx>=0.27",
