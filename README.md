@@ -6,9 +6,9 @@ Work gets posted to a shared board with a required skill tag. Independent worker
 matching work, claim it atomically, do it however they like, and report back. That is the whole
 idea.
 
-It is deliberately not Temporal, Airflow, or Dapr. One HTTP service, one Postgres, two tables, no
-queue and no broker — sized for a solo developer coordinating a dozen small repos, and cheap
-enough to run on free tiers.
+It is deliberately not Temporal, Airflow, or Dapr. One HTTP service, one Postgres, a handful of
+tables, no queue and no broker — sized for a solo developer coordinating a dozen small repos, and
+cheap enough to run on free tiers.
 
 It uses cultivation-sect vocabulary throughout, because naming things is free and this was more
 fun than `worker` and `job`:
@@ -49,12 +49,16 @@ $ pip install the-sect
 The base install is the client: `httpx` and `pydantic`, nothing else. A disciple never talks to
 Postgres.
 
+> **Not on PyPI yet.** Until a release is published, install from git:
+> `pip install "the-sect @ git+https://github.com/bijay-odyssey/the-sect"`. The `pip install
+> the-sect` form above is what it will be once published.
+
 ---
 
 ## Running the Sect itself
 
 ```console
-$ pip install "the-sect[core]"
+$ pip install "the-sect[core] @ git+https://github.com/bijay-odyssey/the-sect"
 $ export DATABASE_URL=postgresql://...
 $ export SECT_MASTER_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
 $ uvicorn sect.core.app:create_app --factory
@@ -63,7 +67,7 @@ $ uvicorn sect.core.app:create_app --factory
 Migrations run on boot behind an advisory lock, so there is no release phase. A `Dockerfile` and a
 Render blueprint are included; it is built to sit on a free tier that spins down when idle.
 
-Then, with `pip install "the-sect[cli]"`:
+Then, with `pip install "the-sect[cli] @ git+https://github.com/bijay-odyssey/the-sect"`:
 
 ```console
 $ sect disciple create scribe --art summarize
@@ -95,9 +99,7 @@ expires the mission becomes claimable again, and a per-claim token means the dis
 vanished cannot come back later and overwrite the result of whoever redid the work.
 
 `tests/test_claim_atomicity.py` fires twenty simultaneous claims at one mission and asserts exactly
-one winner. Swapping in the naive read-then-write version hands the same mission to seven of them.
-
----
+one winner. A naive read-then-write version hands the same mission to several of them.
 
 ---
 
@@ -115,8 +117,8 @@ $ sect disciple create scraper --art web_scraping --peak scraping-peak
 ```
 
 Completed missions earn a disciple **contribution points**; `reputation` is
-`points × success_rate`. Both follow the disciple, not the peak. `examples/../peak-template/` is a
-fork-and-fill-in starting point for a new peak.
+`points × success_rate`. Both follow the disciple, not the peak. [`peak-template/`](peak-template/)
+is a fork-and-fill-in starting point for a new peak.
 
 ---
 
