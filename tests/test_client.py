@@ -9,6 +9,8 @@ retrying *by itself*, into those endpoints, after a response goes missing.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 
 import httpx
 import pytest
@@ -73,6 +75,23 @@ class ColdStart(httpx.BaseTransport):
 
     def close(self) -> None:
         self._inner.close()
+
+
+class RetryAfter(httpx.BaseTransport):
+    """Returns one retryable response with the requested Retry-After form."""
+
+    def __init__(self, value: str) -> None:
+        self._value = value
+        self.attempts = 0
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        self.attempts += 1
+        if self.attempts == 1:
+            return httpx.Response(503, headers={"Retry-After": self._value}, request=request)
+        return httpx.Response(200, json={"ok": True}, request=request)
+
+    def close(self) -> None:
+        pass
 
 
 @pytest.fixture
@@ -209,6 +228,27 @@ def test_sdk_gives_up_after_max_retries(master: SectMaster, make_disciple: Disci
     with pytest.raises(SectUnavailable):
         disciple.claim(mission.id)
     assert transport.attempts == 3, "one attempt plus two retries, then stop"
+
+
+@pytest.mark.parametrize(
+    "retry_after",
+    [
+        "10",
+        format_datetime(datetime.now(UTC) + timedelta(seconds=10), usegmt=True),
+    ],
+    ids=["seconds", "http-date"],
+)
+def test_sdk_caps_retry_after_wait(monkeypatch: pytest.MonkeyPatch, retry_after: str) -> None:
+    transport = RetryAfter(retry_after)
+    waits: list[float] = []
+    monkeypatch.setattr("sect.client.time.sleep", waits.append)
+
+    with SectMaster("http://sect.test", MASTER_KEY, **FAST_BACKOFF, transport=transport) as client:
+        response = client._client.request("GET", "/health")
+
+    assert response.json() == {"ok": True}
+    assert transport.attempts == 2
+    assert waits and all(wait <= FAST_BACKOFF["backoff_cap"] for wait in waits)
 
 
 def test_sdk_does_not_retry_a_deterministic_conflict(
