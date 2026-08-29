@@ -45,6 +45,11 @@ dev = [
 [project.scripts]
 sect = "sect.cli:main"
 
+[project.urls]
+Repository = "https://github.com/bijay-odyssey/the-sect"
+Issues = "https://github.com/bijay-odyssey/the-sect/issues"
+Changelog = "https://github.com/bijay-odyssey/the-sect/blob/main/CHANGELOG.md"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/sect"]
 
