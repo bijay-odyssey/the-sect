@@ -9,10 +9,11 @@ there.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from main import ARTS, PEAK, handle
+from main import ARTS, PEAK, _load_config, handle
 
 from sect import Mission, PermanentFailure
 
@@ -34,6 +35,13 @@ def make_mission(payload: dict[str, object], *, art: str | None = None) -> Missi
 def test_config_is_wired() -> None:
     assert PEAK
     assert ARTS, "peak_config.yaml should declare at least one art"
+
+
+def test_config_preserves_hash_inside_quoted_value(tmp_path: Path) -> None:
+    config = tmp_path / "peak_config.yaml"
+    config.write_text('description: "handles the #1 case"\n', encoding="utf-8")
+
+    assert _load_config(config)["description"] == "handles the #1 case"
 
 
 def test_handler_rejects_the_placeholder() -> None:

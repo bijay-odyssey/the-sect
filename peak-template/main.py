@@ -28,7 +28,15 @@ def _load_config(path: Path) -> dict[str, object]:
     no PyYAML here -- the same choice the core makes for ``.env`` parsing."""
     data: dict[str, object] = {}
     for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.split("#", 1)[0].strip()
+        quote: str | None = None
+        comment_at: int | None = None
+        for index, character in enumerate(raw):
+            if character in "\"'":
+                quote = None if quote == character else character if quote is None else quote
+            elif character == "#" and quote is None:
+                comment_at = index
+                break
+        line = raw[:comment_at].strip() if comment_at is not None else raw.strip()
         if not line or ":" not in line:
             continue
         key, _, value = line.partition(":")
