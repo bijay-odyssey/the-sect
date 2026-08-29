@@ -1,0 +1,84 @@
+name: Bug report
+description: Something behaves differently from what the docs or the code say it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: search [existing issues](https://github.com/bijay-odyssey/the-sect/issues?q=is%3Aissue).
+        Do not paste real tokens, connection strings, or `SECT_MASTER_KEY` values —
+        redact them.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The actual behaviour, including the status code and error body if it's an API call.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: And where the docs or code led you to expect it, if you can point at it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: >
+        The smallest sequence that shows it — `curl` calls, `sect` commands, or a short
+        script. Include the mission/disciple setup, not just the failing call.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which piece
+      options:
+        - The server (sect.core)
+        - The client SDK (sect.client)
+        - The CLI (sect)
+        - Migrations / schema
+        - Docs
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: A release tag, or the output of `git rev-parse --short HEAD`.
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, PostgreSQL version, OS, and how it's deployed (local, Render, Fly, GitHub Actions…).
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Server logs around the failure. `SECT_LOG_JSON` output is ideal.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: I removed any real secrets from the text above.
+          required: true
