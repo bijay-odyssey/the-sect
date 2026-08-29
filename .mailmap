@@ -1,0 +1,3 @@
+# Collapse the maintainer's local-commit and web-merge identities (same address)
+# into one name in `git shortlog` / `git log --use-mailmap`.
+bijay-odyssey <bijaybeezoe@gmail.com> <bijaybeezoe@gmail.com>
