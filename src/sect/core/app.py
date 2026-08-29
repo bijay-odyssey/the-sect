@@ -115,6 +115,19 @@ def create_app(
             status_code=exc.status_code,
         )
 
+    @app.exception_handler(Exception)
+    async def _internal_error(request: Request, exc: Exception) -> JSONResponse:
+        log.exception("Unhandled application exception")
+        return JSONResponse(
+            {
+                "error": {
+                    "code": "internal_error",
+                    "message": "An internal server error occurred.",
+                }
+            },
+            status_code=500,
+        )
+
     # --- routes ------------------------------------------------------------- #
 
     v1 = APIRouter(prefix="/v1")
