@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
+from itertools import pairwise
 from pathlib import Path
 
 import asyncpg
@@ -86,9 +88,27 @@ async def create_pool(settings: Settings) -> asyncpg.Pool:
 
 
 def migration_files() -> list[tuple[str, str]]:
-    """``[(version, sql), ...]`` in lexical order, which is also apply order."""
+    """Return migrations in numeric order, rejecting duplicate or missing versions."""
     files = sorted(MIGRATIONS_DIR.glob("*.sql"), key=lambda p: p.name)
-    return [(p.name, p.read_text(encoding="utf-8")) for p in files]
+    numbered = []
+    for path in files:
+        match = re.match(r"^(\d+)_", path.name)
+        if match is None:
+            raise ValueError(f"Migration filename must start with NNNN_: {path.name}")
+        numbered.append((int(match.group(1)), path))
+    numbered.sort(key=lambda item: item[0])
+    for previous, current in pairwise(numbered):
+        if current[0] == previous[0]:
+            raise ValueError(
+                f"Duplicate migration version {current[0]:04d}: "
+                f"{previous[1].name} and {current[1].name}"
+            )
+        if current[0] != previous[0] + 1:
+            raise ValueError(
+                f"Migration version gap after {previous[1].name}: "
+                f"expected {previous[0] + 1:04d}, found {current[1].name}"
+            )
+    return [(path.name, path.read_text(encoding="utf-8")) for _, path in numbered]
 
 
 async def run_migrations(pool: asyncpg.Pool) -> list[str]:
