@@ -12,11 +12,15 @@ at the time.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-29
+
 ### Added
 
 - `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), `SECURITY.md`, and
   this changelog.
 - Issue forms and a pull-request template under `.github/`.
+- Regression coverage for the SDK's `Retry-After` handling — both the seconds and the
+  HTTP-date form — and the backoff cap (#21, thanks @mikemikimike).
 
 ### Fixed
 
@@ -32,11 +36,6 @@ at the time.
   @mikemikimike).
 - The `peak-template` config reader keeps `#` inside single- or double-quoted values
   (#22, thanks @mikemikimike).
-
-### Added
-
-- Regression coverage for the SDK's `Retry-After` handling — both the seconds and the
-  HTTP-date form — and the backoff cap (#21, thanks @mikemikimike).
 
 ## [0.2.0] - 2026-08-28
 
@@ -106,6 +105,7 @@ Initial version.
 - Docs: the architecture design record, a language-agnostic wire-protocol reference, and
   a "writing a disciple" guide.
 
-[Unreleased]: https://github.com/bijay-odyssey/the-sect/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/bijay-odyssey/the-sect/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/bijay-odyssey/the-sect/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bijay-odyssey/the-sect/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bijay-odyssey/the-sect/releases/tag/v0.1.0
