@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
@@ -17,6 +18,7 @@ router = APIRouter(tags=["meta"])
 
 #: Mounted at the root, outside /v1: it is infrastructure, not protocol.
 health_router = APIRouter(tags=["meta"])
+log = logging.getLogger(__name__)
 
 
 @health_router.get("/health", response_model=Health)
@@ -25,7 +27,8 @@ async def health(request: Request) -> JSONResponse:
     db: str = "ok"
     try:
         await request.app.state.pool.fetchval("SELECT 1")
-    except Exception:
+    except Exception as exc:
+        log.warning("health check: database probe failed: %r", exc)
         db = "unreachable"
 
     payload = Health(
