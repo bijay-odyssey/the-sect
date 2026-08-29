@@ -1,0 +1,59 @@
+name: Feature request
+description: Propose a change to what the core project does.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project is small on purpose. Please read
+        [**Declined on sight**](https://github.com/bijay-odyssey/the-sect/blob/main/CONTRIBUTING.md#declined-on-sight)
+        in CONTRIBUTING first — a queue, an ORM, an async SDK, or a new base
+        dependency won't be accepted without a design discussion, and some not
+        at all.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that you currently can't? Concrete situation, not a solution yet.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Name the file(s), endpoint(s), or SQL statement(s) it would touch.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why-core
+    attributes:
+      label: Why it belongs in the core
+      description: >
+        Rather than living in a disciple, a wrapper, or a downstream fork. The Sect
+        knows *that* work happened, never *how* — where does this sit relative to that line?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: invariants
+    attributes:
+      label: Does it hold the invariants?
+      description: Best guess is fine. If you're unsure about one, leave it unchecked and say so.
+      options:
+        - label: State transitions stay a single guarded `UPDATE` (no read-then-write on the claim path).
+        - label: No new queue, broker, Redis, or ORM.
+        - label: No new dependency in the base install (`httpx` + `pydantic` only).
+        - label: Nothing relies on a client-side clock.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and discussions.
+          required: true
+        - label: I read "Declined on sight" in CONTRIBUTING.
+          required: true

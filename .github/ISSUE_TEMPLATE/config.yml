@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/bijay-odyssey/the-sect/security/advisories/new
+    about: Report privately via a GitHub security advisory. Do not open a public issue.
+  - name: Question or design discussion
+    url: https://github.com/bijay-odyssey/the-sect/discussions
+    about: For "how do I…" and open-ended design questions that aren't a defined task yet.
