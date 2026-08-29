@@ -23,6 +23,20 @@ at the time.
 - README: install commands now show the git install (the package is not on PyPI yet);
   corrected the stale "two tables" count and an unverifiable "seven of them" claim;
   removed a stray horizontal rule and a broken relative link.
+- `/health` logs the database probe failure at warning level instead of swallowing it
+  (#20, thanks @mikemikimike).
+- Unhandled exceptions return the `{"error": {…}}` JSON envelope instead of a bare
+  plain-text 500 (#24, thanks @mikemikimike).
+- Migration discovery rejects duplicate or missing version numbers at startup, naming
+  the offending files, instead of applying them in filename order (#23, thanks
+  @mikemikimike).
+- The `peak-template` config reader keeps `#` inside single- or double-quoted values
+  (#22, thanks @mikemikimike).
+
+### Added
+
+- Regression coverage for the SDK's `Retry-After` handling — both the seconds and the
+  HTTP-date form — and the backoff cap (#21, thanks @mikemikimike).
 
 ## [0.2.0] - 2026-08-28
 

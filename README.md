@@ -132,6 +132,14 @@ is a fork-and-fill-in starting point for a new peak.
   `examples/disciple-scribe/`.
 - [peak-template/](peak-template/) — copy this to start a new peak.
 
+## Contributing
+
+Issues and PRs are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the architecture in a page,
+the invariants a PR is judged on, and how to run the tests locally; there are
+[good first issues](https://github.com/bijay-odyssey/the-sect/labels/good%20first%20issue) open.
+
+Thanks to everyone who has [contributed](https://github.com/bijay-odyssey/the-sect/graphs/contributors).
+
 ## Status
 
 v0.2: peaks, a per-disciple contribution ledger, structured JSON logs. Still honestly scoped —
